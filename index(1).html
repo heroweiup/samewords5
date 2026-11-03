@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>同词相遇</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+/* ===== 基础重置与字体 ===== */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-deep:#0a0e27;
+  --bg-mid:#121640;
+  --bg-light:#1a1f55;
+  --accent:#6ee7c7;
+  --accent-glow:rgba(110,231,199,.35);
+  --accent-dim:rgba(110,231,199,.12);
+  --gold:#ffd666;
+  --gold-glow:rgba(255,214,102,.3);
+  --rose:#ff8fab;
+  --rose-glow:rgba(255,143,171,.25);
+  --text:#e8ecff;
+  --text-dim:rgba(232,236,255,.6);
+  --text-muted:rgba(232,236,255,.35);
+  --card-bg:rgba(255,255,255,.06);
+  --card-border:rgba(255,255,255,.1);
+  --card-shadow:0 8px 32px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);
+  --radius:18px;
+  --radius-sm:12px;
+  --radius-xs:8px;
+  --transition:all .25s cubic-bezier(.4,0,.2,1);
+}
+body{
+  font-family:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+  background:var(--bg-deep);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  padding:20px 16px;
+  color:var(--text);
+  overflow-x:hidden;
+  position:relative;
+}
+
+/* ===== 动态背景光球 ===== */
+.bg-orb{
+  position:fixed;
+  border-radius:50%;
+  filter:blur(80px);
+  opacity:.35;
+  pointer-events:none;
+  z-index:0;
+  animation:orbFloat 20s ease-in-out infinite alternate;
+}
+.bg-orb:nth-child(1){
+  width:420px;height:420px;
+  background:radial-gradient(circle,#6ee7c7 0%,transparent 70%);
+  top:-10%;left:-10%;
+  animation-delay:0s;
+}
+.bg-orb:nth-child(2){
+  width:350px;height:350px;
+  background:radial-gradient(circle,#8b8bff 0%,transparent 70%);
+  bottom:-8%;right:-8%;
+  animation-delay:-7s;
+}
+.bg-orb:nth-child(3){
+  width:280px;height:280px;
+  background:radial-gradient(circle,#ffd666 0%,transparent 70%);
+  top:40%;left:60%;
+  opacity:.2;
+  animation-delay:-14s;
+}
+@keyframes orbFloat{
+  0%{transform:translate(0,0) scale(1);}
+  33%{transform:translate(30px,-40px) scale(1.08);}
+  66%{transform:translate(-20px,30px) scale(.95);}
+  100%{transform:translate(40px,20px) scale(1.05);}
+}
+
+/* ===== 主容器 ===== */
+#app{
+  width:100%;
+  max-width:440px;
+  position:relative;
+  z-index:1;
+}
+
+/* ===== 标题 ===== */
+h1{
+  text-align:center;
+  font-size:32px;
+  font-weight:800;
+  letter-spacing:8px;
+  margin-bottom:20px;
+  background:linear-gradient(135deg,#fff 0%,var(--accent) 50%,var(--gold) 100%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  filter:drop-shadow(0 2px 12px rgba(110,231,199,.25));
+  line-height:1.2;
+}
+
+/* ===== 卡片 ===== */
+.card{
+  background:var(--card-bg);
+  backdrop-filter:blur(20px) saturate(140%);
+  -webkit-backdrop-filter:blur(20px) saturate(140%);
+  border:1px solid var(--card-border);
+  border-radius:var(--radius);
+  padding:24px 20px;
+  box-shadow:var(--card-shadow);
+  position:relative;
+  overflow:hidden;
+}
+.card::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);
+}
+
+/* ===== 模式选择 ===== */
+.mode{
+  display:flex;
+  gap:10px;
+  margin-bottom:16px;
+}
+.mode-btn{
+  flex:1;
+  padding:14px 10px;
+  border-radius:var(--radius-sm);
+  border:1.5px solid var(--card-border);
+  background:rgba(255,255,255,.04);
+  color:var(--text-dim);
+  font-size:14px;
+  line-height:1.5;
+  cursor:pointer;
+  transition:var(--transition);
+  position:relative;
+  overflow:hidden;
+}
+.mode-btn::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:radial-gradient(circle at var(--x,50%) var(--y,50%),rgba(255,255,255,.08),transparent 60%);
+  opacity:0;
+  transition:opacity .3s;
+}
+.mode-btn:hover::after{opacity:1;}
+.mode-btn:hover{
+  border-color:rgba(255,255,255,.25);
+  color:var(--text);
+  transform:translateY(-1px);
+}
+.mode-btn.on{
+  border-color:var(--accent);
+  background:var(--accent-dim);
+  color:var(--text);
+  font-weight:600;
+  box-shadow:0 0 20px var(--accent-glow);
+}
+.mode-btn small{
+  display:block;
+  font-size:12px;
+  opacity:.65;
+  margin-top:4px;
+  line-height:1.4;
+}
+.mode-btn.on small{opacity:.8;}
+
+/* ===== 按钮 ===== */
+button{cursor:pointer;font-family:inherit}
+.primary{
+  padding:14px 20px;
+  border:none;
+  border-radius:var(--radius-sm);
+  background:linear-gradient(135deg,var(--accent) 0%,#5dd5b5 100%);
+  color:#0a2e26;
+  font-size:15px;
+  font-weight:700;
+  margin:8px 0;
+  width:100%;
+  transition:var(--transition);
+  position:relative;
+  overflow:hidden;
+  letter-spacing:.5px;
+}
+.primary::before{
+  content:'';
+  position:absolute;
+  top:0;left:-100%;
+  width:100%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);
+  transition:left .5s;
+}
+.primary:hover::before{left:100%;}
+.primary:hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 24px var(--accent-glow);
+}
+.primary:active{transform:translateY(0) scale(.98);}
+.primary:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+  transform:none!important;
+  box-shadow:none!important;
+}
+
+.secondary{
+  padding:12px 16px;
+  border:1.5px solid rgba(255,255,255,.2);
+  border-radius:var(--radius-sm);
+  background:rgba(255,255,255,.06);
+  color:var(--text);
+  font-size:14px;
+  margin:6px 0;
+  width:100%;
+  transition:var(--transition);
+}
+.secondary:hover{
+  border-color:rgba(255,255,255,.35);
+  background:rgba(255,255,255,.1);
+  transform:translateY(-1px);
+}
+.secondary:active{transform:translateY(0) scale(.98);}
+
+.link{
+  background:none;border:none;
+  color:var(--accent);
+  font-size:13px;
+  text-decoration:none;
+  margin-top:8px;
+  width:100%;
+  transition:var(--transition);
+  opacity:.8;
+}
+.link:hover{opacity:1;text-decoration:underline;}
+
+/* ===== 输入行 ===== */
+.row{display:flex;gap:8px;margin:12px 0}
+.row .primary{width:auto;padding:12px 22px;margin:0;white-space:nowrap}
+input{
+  flex:1;
+  padding:13px 16px;
+  border-radius:var(--radius-sm);
+  border:1.5px solid var(--card-border);
+  background:rgba(0,0,0,.3);
+  color:var(--text);
+  font-size:15px;
+  transition:var(--transition);
+  outline:none;
+}
+input::placeholder{color:var(--text-muted)}
+input:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-dim);
+  background:rgba(0,0,0,.4);
+}
+
+/* ===== 状态信息 ===== */
+.status{
+  font-size:13px;
+  opacity:.8;
+  line-height:1.8;
+  min-height:24px;
+  padding:4px 0;
+}
+
+/* ===== 顶部栏 ===== */
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:13px;
+  opacity:.85;
+  margin-bottom:12px;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.top span:first-child{
+  font-weight:600;
+  letter-spacing:.5px;
+}
+
+/* ===== 图标按钮 ===== */
+.icon{
+  background:rgba(255,255,255,.06);
+  border:1.5px solid var(--card-border);
+  border-radius:var(--radius-xs);
+  color:var(--text);
+  font-size:14px;
+  padding:5px 10px;
+  transition:var(--transition);
+  line-height:1;
+}
+.icon:hover{
+  background:rgba(255,255,255,.12);
+  border-color:rgba(255,255,255,.25);
+  transform:translateY(-1px);
+}
+
+/* ===== 主题提示 ===== */
+.theme{
+  text-align:center;
+  font-size:15px;
+  margin:10px 0 14px;
+  padding:12px 16px;
+  border-radius:var(--radius-sm);
+  background:linear-gradient(135deg,rgba(255,214,102,.1),rgba(255,214,102,.05));
+  border:1.5px dashed rgba(255,214,102,.4);
+  letter-spacing:.5px;
+}
+.theme b{
+  color:var(--gold);
+  font-size:18px;
+  font-weight:700;
+  text-shadow:0 0 12px var(--gold-glow);
+}
+
+/* ===== 提示文字 ===== */
+.hint{
+  font-size:13px;
+  opacity:.7;
+  text-align:center;
+  margin:4px 0 10px;
+  min-height:20px;
+  line-height:1.6;
+}
+
+/* ===== 结果区域 ===== */
+.result{
+  margin:14px 0;
+  padding:18px 16px;
+  border-radius:var(--radius-sm);
+  background:rgba(0,0,0,.25);
+  text-align:center;
+  line-height:2;
+  position:relative;
+  overflow:hidden;
+}
+.result::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:2px;
+  background:linear-gradient(90deg,var(--accent),var(--gold),var(--accent));
+  opacity:0;
+  transition:opacity .3s;
+}
+.result.win::before{opacity:1;}
+.result .label{font-size:12px;opacity:.6;margin-bottom:4px;letter-spacing:1px}
+.result .ok{
+  color:var(--accent);
+  font-weight:700;
+  font-size:22px;
+  text-shadow:0 0 16px var(--accent-glow);
+  margin-bottom:6px;
+}
+.result .no{
+  color:var(--rose);
+  font-weight:700;
+  font-size:18px;
+  text-shadow:0 0 12px var(--rose-glow);
+  margin-bottom:6px;
+}
+.result .word{
+  font-size:24px;
+  font-weight:800;
+  color:#fff;
+  display:inline-block;
+  padding:2px 12px;
+  border-radius:8px;
+  background:rgba(255,255,255,.08);
+}
+.result .word.hit{
+  color:var(--accent);
+  text-shadow:0 0 16px var(--accent-glow);
+  background:var(--accent-dim);
+  animation:wordPulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes wordPulse{
+  from{text-shadow:0 0 8px var(--accent-glow);transform:scale(1);}
+  to{text-shadow:0 0 24px var(--accent-glow);transform:scale(1.05);}
+}
+
+/* ===== 历史相遇词语 ===== */
+.history{
+  margin:14px 0 8px;
+  padding:14px 16px;
+  border-radius:var(--radius-sm);
+  background:linear-gradient(135deg,rgba(110,231,199,.06),rgba(110,231,199,.02));
+  border:1px solid rgba(110,231,199,.15);
+}
+.history-title{
+  font-size:12px;
+  color:var(--accent);
+  letter-spacing:3px;
+  margin-bottom:10px;
+  text-align:center;
+  font-weight:600;
+  opacity:.85;
+}
+.history-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  justify-content:center;
+}
+.history-item{
+  display:inline-flex;
+  align-items:baseline;
+  gap:5px;
+  padding:5px 12px;
+  border-radius:999px;
+  background:linear-gradient(135deg,rgba(110,231,199,.15),rgba(110,231,199,.08));
+  border:1px solid rgba(110,231,199,.25);
+  font-size:13px;
+  animation:popIn .4s cubic-bezier(.34,1.56,.64,1);
+  box-shadow:0 2px 8px rgba(110,231,199,.1);
+}
+.history-item b{color:var(--accent);font-weight:700;font-size:14px}
+.history-item small{opacity:.55;font-size:11px;color:var(--text-dim)}
+.history-empty{font-size:12px;opacity:.45;text-align:center;display:block;width:100%;padding:6px 0}
+
+@keyframes popIn{
+  0%{transform:scale(0);opacity:0;}
+  100%{transform:scale(1);opacity:1;}
+}
+
+/* ===== 轻提示 Toast ===== */
+#toast{
+  position:fixed;
+  left:50%;
+  bottom:60px;
+  transform:translate(-50%,20px);
+  background:rgba(15,20,50,.95);
+  border:1px solid rgba(110,231,199,.4);
+  color:var(--text);
+  font-size:14px;
+  padding:11px 22px;
+  border-radius:999px;
+  opacity:0;
+  pointer-events:none;
+  transition:all .35s cubic-bezier(.4,0,.2,1);
+  z-index:200;
+  white-space:nowrap;
+  max-width:90vw;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+  backdrop-filter:blur(10px);
+}
+#toast.on{
+  opacity:1;
+  transform:translate(-50%,0);
+}
+
+/* ===== 特效层 ===== */
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:99}
+#flash{
+  position:fixed;inset:0;pointer-events:none;z-index:98;
+  background:radial-gradient(circle at 50% 42%,rgba(255,214,102,.4),rgba(110,231,199,.2) 38%,transparent 72%);
+  opacity:0;
+}
+#flash.on{animation:flash .9s ease-out forwards}
+@keyframes flash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
+
+/* ===== 动画 ===== */
+.hidden{display:none!important}
+.result.pop{animation:pop .55s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{
+  0%{transform:scale(.85);opacity:0;}
+  100%{transform:scale(1);opacity:1;}
+}
+.result.win{
+  border:1px solid rgba(110,231,199,.4);
+  box-shadow:0 0 30px rgba(110,231,199,.15);
+  animation:pop .55s cubic-bezier(.34,1.56,.64,1),glow 2s ease-in-out .5s infinite alternate;
+}
+@keyframes glow{
+  from{box-shadow:0 0 20px rgba(110,231,199,.15);}
+  to{box-shadow:0 0 50px rgba(110,231,199,.3);}
+}
+.result.lose{
+  animation:pop .45s cubic-bezier(.34,1.56,.64,1),shake .5s .15s;
+}
+@keyframes shake{
+  0%,100%{transform:translateX(0);}
+  20%{transform:translateX(-6px);}
+  40%{transform:translateX(6px);}
+  60%{transform:translateX(-4px);}
+  80%{transform:translateX(4px);}
+}
+
+/* ===== 署名 ===== */
+.footer{
+  text-align:center;
+  font-size:12px;
+  opacity:.35;
+  margin-top:16px;
+  letter-spacing:2px;
+  color:var(--text-dim);
+}
+
+/* ===== 滚动条美化 ===== */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.25)}
+
+/* ===== 选中文字 ===== */
+::selection{background:rgba(110,231,199,.3);color:#fff}
+</style>
+</head>
+<body>
+<!-- 背景光球 -->
+<div class="bg-orb"></div>
+<div class="bg-orb"></div>
+<div class="bg-orb"></div>
+
+<canvas id="fx"></canvas>
+<div id="flash"></div>
+<div id="toast"></div>
+
+<div id="app">
+  <h1>同词相遇</h1>
+
+  <!-- 主页 -->
+  <div id="home" class="card">
+    <div class="mode">
+      <button class="mode-btn on" data-mode="free">自由模式<small>任意词语，想到一块就赢</small></button>
+      <button id="themeModeBtn" class="mode-btn" data-mode="theme">主题模式<small>围绕主题同词赢</small></button>
+    </div>
+    <button id="createBtn" class="primary">创建房间</button>
+    <div class="row">
+      <input id="joinCode" placeholder="输入对方房间码" maxlength="8">
+      <button id="joinBtn" class="primary">加入</button>
+    </div>
+    <div id="status" class="status">选择模式后创建房间，把房间码发给朋友。</div>
+    <button id="copyCodeBtn" class="secondary hidden">复制房间码</button>
+  </div>
+
+  <!-- 游戏界面 -->
+  <div id="game" class="card hidden">
+    <div class="top">
+      <span id="roomInfo"></span>
+      <span style="display:flex;gap:8px;align-items:center">
+        <span id="score"></span>
+        <button id="copyBtn" class="icon" title="复制房间码">⎘</button>
+        <button id="soundBtn" class="icon">♪</button>
+      </span>
+    </div>
+    <div id="themeBox" class="theme hidden">本回合主题：<b id="themeName"></b></div>
+    <div id="hint" class="hint"></div>
+
+    <!-- 历史相遇词语 -->
+    <div id="historyBox" class="history hidden">
+      <div class="history-title">✦ 相遇记录 ✦</div>
+      <div id="historyList" class="history-list"></div>
+    </div>
+
+    <div class="row">
+      <input id="wordInput" placeholder="写下你想到的词" maxlength="20">
+      <button id="submitBtn" class="primary">提交</button>
+    </div>
+    <div id="result" class="result hidden"></div>
+    <button id="skipThemeBtn" class="secondary hidden">换一个新主题</button>
+    <button id="nextBtn" class="primary hidden">下一回合</button>
+    <button id="againBtn" class="primary hidden">再来一局</button>
+    <button id="quitBtn" class="link">退出房间</button>
+  </div>
+</div>
+
+<div class="footer">制作者：花椒</div>
+
+<script>
+/* ===== 400 个主题 ===== */
+const THEME_NAMES = [
+  "水果","蔬菜","动物","主食","零食","饮品","甜品","调味料","海鲜","肉类",
+  "早餐食物","火锅食材","烧烤食材","地方小吃","世界名菜","咖啡饮品","茶的种类","酒类","面包糕点","坚果干果",
+  "自然景观","天气现象","二十四节气","花卉","鸟类","海洋生物","昆虫","树木","菌菇","矿物宝石",
+  "星球","地貌类型","云朵形态","季节","声音","恐龙","微生物","植物器官","农作物","宠物品种",
+  "宠物","野生动物","爬行动物","鱼类","农场动物","濒危动物","哺乳动物","候鸟","猫的品种","狗的品种",
+  "身体部位","五官","内脏器官","情绪","五感","常见疾病","药物","医疗用品","健身动作","中医穴位",
+  "家具","家电","厨房用品","卫生间用品","清洁用品","收纳用品","灯具","床上用品","装修材料","房间名称",
+  "服装","鞋子","帽子","配饰","面料","传统服饰","职业着装","冬季衣物","夏季衣物","童装",
+  "交通工具","汽车品牌","道路设施","交通标志","车站类型","旅行方式","住宿类型","行李物品","旅行证件","旅游地标",
+  "手工工具","五金工具","电子元件","电脑硬件","软件类型","编程语言","手机功能","文件格式","人工智能应用","网络用语",
+  "职业","学科","文具","办公用品","考试类型","学位名称","科研领域","课堂活动","校园设施","职场场景",
+  "电影类型","音乐类型","乐器","舞蹈类型","绘画风格","文学体裁","戏剧角色","摄影题材","手工艺","建筑样式",
+  "电子游戏","桌游","棋牌游戏","玩具","户外运动","极限运动","水上运动","球类运动","冬奥项目","体育器材",
+  "成语","神话人物","历史人物","历史事件","中国朝代","传统节日","西方节日","民俗活动","宗教场所","世界文化遗产",
+  "古诗词名句","歇后语","谚语","汉字部首","修辞手法","标点符号","外语问候语","方言词汇","网络流行语","表情符号",
+  "城市","国家","大洲","大洋","河流","山脉","湖泊","岛屿","首都","语言",
+  "颜色","几何形状","数字","时间单位","方位","材质","味道","气味","温度感受","性格特点",
+  "人际关系","人生阶段","兴趣爱好","童年回忆","校园生活","周末活动","家务劳动","购物场所","餐厅类型","约会场景",
+  "手机品牌","运动品牌","饮料品牌","快餐品牌","电商平台","社交软件","视频平台","音乐软件","地图软件","相机品牌",
+  "动漫角色","电影角色","电视剧类型","综艺节目","童话角色","超级英雄","科幻设定","恐怖元素","纪录片题材","播客话题",
+  "传统乐器","民族服饰","地方戏曲","民间工艺","古镇","庙会","茶具","书法字体","国画题材","文房四宝",
+  "星座","生肖","神话生物","传说地点","魔法道具","超能力","外星生物","末日场景","时间旅行","平行世界",
+  "早餐店","夜市小吃","奶茶配料","冰淇淋口味","蛋糕款式","巧克力类型","糖果","饼干","果酱","沙拉食材",
+  "电影台词","经典歌曲","流行舞蹈","综艺游戏","网络热梗","童年动画","经典游戏","小说类型","漫画风格","舞台剧",
+  "办公室物品","会议类型","邮件用语","工作情绪","通勤方式","午休活动","加班理由","职场称呼","面试问题","辞职理由",
+  "婴儿用品","幼儿园活动","小学课程","中学社团","大学专业","宿舍神器","考试用品","毕业季","同学聚会","校园绰号",
+  "春节习俗","元宵活动","清明活动","端午习俗","中秋习俗","重阳活动","冬至食物","腊八食物","除夕活动","拜年话",
+  "地铁站名","公交线路","共享单车","网约车","高铁座位","机场设施","轮渡","索道","加油站","停车场",
+  "洗发水品牌","护肤品类型","化妆品","香水调性","美甲款式","发型","剃须用品","面膜","防晒","牙膏品牌",
+  "婚礼环节","生日礼物","节日礼物","道歉方式","表白方式","分手理由","约会地点","情侣称呼","纪念日","求婚方式",
+  "游戏职业","游戏道具","游戏地图","游戏Boss","游戏技能","游戏副本","游戏装备","游戏宠物","游戏称号","游戏成就",
+  "数学符号","物理单位","化学元素","生物分类","天文现象","地质年代","历史年代","哲学流派","心理学效应","经济学概念",
+  "早餐搭配","午餐便当","晚餐菜谱","夜宵","下午茶","减脂餐","素食","火锅蘸料","烧烤调料","家常菜",
+  "春节装饰","圣诞装饰","万圣节装扮","生日布置","婚礼布置","派对主题","气球造型","彩带","蜡烛","烟花",
+  "猫的行为","狗的行为","鸟类行为","鱼类行为","昆虫行为","动物叫声","动物睡姿","动物食物","动物栖息地","动物迁徙",
+  "健身器材","瑜伽动作","跑步姿势","游泳姿势","篮球动作","足球动作","羽毛球动作","乒乓球动作","滑雪动作","攀岩装备",
+  "手机APP类型","电脑软件","浏览器","输入法","杀毒软件","压缩软件","剪辑软件","修图软件","办公软件","记账软件",
+  "中国省份","中国城市","世界首都","著名山脉","著名河流","著名湖泊","著名沙漠","著名瀑布","著名峡谷","著名海岛",
+  "早餐粥","汤类","面条种类","饺子馅","包子馅","饼类","米饭做法","炒菜","炖菜","凉菜",
+  "咖啡豆产地","奶茶品牌","果汁种类","碳酸饮料","功能饮料","乳制品","豆制品","鸡尾酒","矿泉水品牌","气泡水"
+];
+
+const $ = s => document.querySelector(s);
+const rand = n => Math.floor(Math.random() * n);
+const norm = s => s.trim().toLowerCase().replace(/\s+/g, '');
+const genCode = () => Array.from({length:5}, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[rand(32)]).join('');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ===== 背景光球跟随鼠标 ===== */
+document.addEventListener('mousemove', e => {
+  const orbs = document.querySelectorAll('.bg-orb');
+  const x = (e.clientX / window.innerWidth - 0.5) * 2;
+  const y = (e.clientY / window.innerHeight - 0.5) * 2;
+  orbs.forEach((orb, i) => {
+    const speed = (i + 1) * 8;
+    orb.style.transform = `translate(${x * speed}px, ${y * speed}px)`;
+  });
+});
+
+/* ===== 彩带特效 ===== */
+const fx = $('#fx'), fctx = fx.getContext('2d');
+let parts = [], raf = null;
+const COLORS = ['#ffd666','#6ee7c7','#8ef0c0','#ff8fab','#8b8bff','#ffffff'];
+function resize() {
+  const d = devicePixelRatio || 1;
+  fx.width = innerWidth * d;
+  fx.height = innerHeight * d;
+  fctx.setTransform(d,0,0,d,0,0);
+}
+addEventListener('resize', resize);
+resize();
+
+function burst() {
+  const cx = innerWidth / 2, cy = innerHeight * 0.45;
+  for(let i = 0; i < 140; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 8;
+    parts.push({
+      x: cx, y: cy,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp - 2.5,
+      g: .16 + Math.random() * .12,
+      life: 1,
+      decay: .011 + Math.random() * .012,
+      size: 4 + Math.random() * 7,
+      color: COLORS[rand(COLORS.length)],
+      rot: Math.random() * Math.PI,
+      vr: (Math.random() - .5) * .35,
+      shape: rand(3)
+    });
+  }
+  if(!raf) loop();
+}
+function loop() {
+  fctx.clearRect(0,0,innerWidth,innerHeight);
+  parts = parts.filter(p => p.life > 0);
+  parts.forEach(p => {
+    p.vy += p.g;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.rot += p.vr;
+    p.life -= p.decay;
+    fctx.save();
+    fctx.globalAlpha = Math.max(p.life, 0);
+    fctx.translate(p.x, p.y);
+    fctx.rotate(p.rot);
+    fctx.fillStyle = p.color;
+    if(p.shape === 0) {
+      fctx.fillRect(-p.size/2, -p.size/2, p.size, p.size * .6);
+    } else if(p.shape === 1) {
+      fctx.beginPath();
+      fctx.arc(0,0,p.size/2,0,Math.PI*2);
+      fctx.fill();
+    } else {
+      fctx.beginPath();
+      fctx.moveTo(0,-p.size/2);
+      fctx.lineTo(p.size/2, p.size/2);
+      fctx.lineTo(-p.size/2, p.size/2);
+      fctx.closePath();
+      fctx.fill();
+    }
+    fctx.restore();
+  });
+  raf = parts.length ? requestAnimationFrame(loop) : null;
+  if(!parts.length) fctx.clearRect(0,0,innerWidth,innerHeight);
+}
+function flashScreen() {
+  const f = $('#flash');
+  f.classList.remove('on');
+  void f.offsetWidth;
+  f.classList.add('on');
+}
+
+/* ===== 音效 ===== */
+let ac = null, muted = false;
+async function ensureAudio() {
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    if(ac && ac.state === 'suspended') {
+      try { await ac.resume(); } catch(e) {}
+    }
+  } catch(e) {}
+}
+addEventListener('pointerdown', () => ensureAudio(), {once:false});
+addEventListener('touchstart', () => ensureAudio(), {once:false});
+function tone(freq, dur, delay, type, gain) {
+  if(!ac || muted) return;
+  if(ac.state === 'suspended') ac.resume().catch(() => {});
+  const t = ac.currentTime + (delay || 0);
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type || 'sine';
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain || .15, t + .02);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g).connect(ac.destination);
+  o.start(t);
+  o.stop(t + dur + .05);
+}
+async function playMatch() {
+  await ensureAudio();
+  tone(523.25,.5,0,'triangle',.18);
+  tone(659.25,.5,.09,'triangle',.16);
+  tone(783.99,.7,.18,'triangle',.16);
+  tone(1046.5,.9,.27,'sine',.12);
+}
+async function playMiss() {
+  await ensureAudio();
+  tone(196,.4,0,'sine',.12);
+  tone(146.83,.5,.12,'sine',.1);
+}
+$('#soundBtn').onclick = () => {
+  muted = !muted;
+  $('#soundBtn').textContent = muted ? '♫' : '♪';
+};
+
+/* ===== 轻提示 ===== */
+let toastTimer = null;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), 1800);
+}
+
+/* ===== 游戏逻辑 ===== */
+const THEME_ROUNDS = 10;
+document.querySelector('#themeModeBtn small').textContent =
+  '围绕主题同词赢，共 ' + THEME_ROUNDS + ' 回合';
+
+let peer = null, conn = null, mode = 'free', isHost = false;
+let roomCode = '', myWord = '', otherWord = '', theme = '', round = 0, wins = 0, used = [];
+let matchHistory = [];
+
+const roundLimit = () => (mode === 'theme' ? THEME_ROUNDS : Infinity);
+const isFinalRound = () => round >= roundLimit();
+
+document.querySelectorAll('.mode-btn').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.mode-btn').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  mode = b.dataset.mode;
+});
+$('#createBtn').onclick = createRoom;
+$('#joinBtn').onclick = joinRoom;
+$('#submitBtn').onclick = submitWord;
+$('#skipThemeBtn').onclick = skipTheme;
+$('#nextBtn').onclick = () => { if(isHost) nextRound(); };
+$('#againBtn').onclick = () => {
+  try { conn && conn.send({type:'restart'}); } catch(e) {}
+  restartGame();
+};
+$('#copyBtn').onclick = copyRoomCode;
+$('#copyCodeBtn').onclick = copyRoomCode;
+$('#quitBtn').onclick = () => {
+  try { conn && conn.send({type:'quit'}); } catch(e) {}
+  location.reload();
+};
+const setStatus = t => $('#status').textContent = t;
+
+/* ===== 复制房间码 ===== */
+function copyRoomCode() {
+  if(!roomCode) return toast('还没有房间码哦');
+  const done = () => toast('房间码已复制：' + roomCode);
+  const fallback = () => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = roomCode;
+      ta.style.position = 'fixed';
+      ta.style.top = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch(e) {
+      toast('复制失败，请手动记下房间码：' + roomCode);
+    }
+  };
+  if(navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(roomCode).then(done).catch(fallback);
+  } else {
+    fallback();
+  }
+}
+
+function pickTheme() {
+  let pool = THEME_NAMES.filter(t => !used.includes(t));
+  if(!pool.length) {
+    used = [];
+    pool = THEME_NAMES;
+  }
+  const t = pool[rand(pool.length)];
+  used.push(t);
+  return t;
+}
+
+function createRoom() {
+  roomCode = genCode();
+  isHost = true;
+  wins = 0;
+  matchHistory = [];
+  round = 0;
+  peer = new Peer(roomCode, {debug:0});
+  peer.on('open', () => {
+    setStatus('房间码：' + roomCode + '  等待朋友加入…');
+    $('#copyCodeBtn').classList.remove('hidden');
+  });
+  peer.on('connection', c => {
+    conn = c;
+    c.on('open', () => {
+      const t = pickTheme();
+      c.send({type:'start', mode, theme:t, round:1, wins, history: matchHistory});
+      enterGame(t, 1);
+    });
+    c.on('data', onData);
+    c.on('close', () => {
+      setStatus('对方已断开连接');
+      $('#hint').textContent = '对方已断开连接';
+    });
+  });
+  peer.on('error', e => setStatus('创建失败：' + e.type));
+}
+
+function joinRoom() {
+  const code = $('#joinCode').value.trim().toUpperCase();
+  if(!code) return setStatus('请输入房间码');
+  roomCode = code;
+  isHost = false;
+  wins = 0;
+  matchHistory = [];
+  peer = new Peer({debug:0});
+  peer.on('open', () => {
+    conn = peer.connect(roomCode, {reliable:true});
+    conn.on('open', () => setStatus('已连接，等待房主开始…'));
+    conn.on('data', onData);
+    conn.on('close', () => {
+      setStatus('对方已断开连接');
+      $('#hint').textContent = '对方已断开连接';
+    });
+  });
+  peer.on('error', e => setStatus('连接失败：' + e.type + '，请检查房间码'));
+}
+
+function onData(msg) {
+  if(msg.type === 'start') {
+    mode = msg.mode;
+    if(typeof msg.wins === 'number') wins = msg.wins;
+    if(Array.isArray(msg.history)) matchHistory = msg.history;
+    enterGame(msg.theme, msg.round);
+  }
+  if(msg.type === 'next') {
+    if(typeof msg.wins === 'number') wins = msg.wins;
+    if(Array.isArray(msg.history)) matchHistory = msg.history;
+    enterGame(msg.theme, msg.round);
+  }
+  if(msg.type === 'skip') {
+    theme = msg.theme;
+    applyTheme();
+    resetRound();
+  }
+  if(msg.type === 'submit') {
+    otherWord = msg.word;
+    if(myWord) maybeReveal();
+  }
+  if(msg.type === 'reveal') {
+    if(typeof msg.wins === 'number') wins = msg.wins;
+    if(Array.isArray(msg.history)) matchHistory = msg.history;
+    showResult(msg.words, msg.match);
+  }
+  if(msg.type === 'quit') {
+    setStatus('对方已退出房间');
+    $('#hint').textContent = '对方已退出房间';
+  }
+  if(msg.type === 'restart') {
+    restartGame();
+  }
+}
+
+function applyTheme() {
+  $('#themeName').textContent = theme;
+  $('#hint').textContent = mode === 'theme'
+    ? '围绕「' + theme + '」，写下你最先想到的词'
+    : '想到什么就写什么';
+}
+
+function resetRound() {
+  myWord = '';
+  otherWord = '';
+  $('#wordInput').value = '';
+  $('#wordInput').disabled = false;
+
+  $('#nextBtn').classList.add('hidden');
+  $('#againBtn').classList.add('hidden');
+  parts = [];
+}
+
+function enterGame(t, r) {
+  theme = t;
+  round = r;
+  $('#home').classList.add('hidden');
+  $('#game').classList.remove('hidden');
+  $('#roomInfo').textContent = '房间 ' + roomCode + ' · 第 ' + r + ' 回合' +
+    (mode === 'theme' ? ' / ' + THEME_ROUNDS : '');
+  $('#score').textContent = '相遇成功 ' + wins + ' 次';
+  $('#themeBox').classList.toggle('hidden', mode !== 'theme');
+  $('#historyBox').classList.toggle('hidden', mode !== 'theme');
+  applyTheme();
+  renderHistory();
+  resetRound();
+}
+
+/* ===== 历史相遇词语渲染 ===== */
+function renderHistory() {
+  const list = $('#historyList');
+  if(!list) return;
+  if(!matchHistory.length) {
+    list.innerHTML = '<span class="history-empty">还没有成功相遇的词语</span>';
+    return;
+  }
+  list.innerHTML = matchHistory.map(h =>
+    '<span class="history-item"><b>' + esc(h.word) + '</b><small>' + esc(h.theme) + '</small></span>'
+  ).join('');
+}
+
+function skipTheme() {
+  if(!isHost) return;
+  theme = pickTheme();
+  try { conn && conn.send({type:'skip', theme}); } catch(e) {}
+  applyTheme();
+  resetRound();
+}
+
+function submitWord() {
+  const w = $('#wordInput').value.trim();
+  if(!w) return alert('请先写下一个词');
+  myWord = w;
+  $('#wordInput').disabled = true;
+  try { conn && conn.send({type:'submit', word:w}); } catch(e) {}
+  $('#hint').textContent = '已提交，等待对方…';
+  if(otherWord) maybeReveal();
+}
+
+function maybeReveal() {
+  if(!isHost) return;
+  const match = norm(myWord) === norm(otherWord);
+  if(match) {
+    wins++;
+    if(mode === 'theme') matchHistory.push({word: myWord.trim(), theme});
+  }
+  const words = {host: myWord, guest: otherWord};
+  try {
+    conn && conn.send({type:'reveal', words, match, wins, history: matchHistory});
+  } catch(e) {}
+  showResult(words, match);
+}
+
+function showResult(words, match) {
+  const mine = isHost ? words.host : words.guest;
+  const other = isHost ? words.guest : words.host;
+  const last = isFinalRound();
+
+  $('#result').classList.remove('hidden');
+  if(match) {
+    $('#result').className = 'result win';
+    $('#result').innerHTML = `
+      <div class="ok">相遇成功！</div>
+      <div>我：<span class="word hit">${esc(mine)}</span></div>
+      <div>对方：<span class="word hit">${esc(other)}</span></div>
+    `;
+    burst();
+    flashScreen();
+    playMatch();
+  } else {
+    $('#result').className = 'result lose';
+    $('#result').innerHTML = `
+      <div class="no">擦肩而过</div>
+      <div>我：<span class="word">${esc(mine)}</span></div>
+      <div>对方：<span class="word">${esc(other)}</span></div>
+    `;
+    playMiss();
+  }
+  $('#score').textContent = '相遇成功 ' + wins + ' 次';
+  renderHistory();
+
+  if(last) {
+    $('#nextBtn').classList.add('hidden');
+    $('#againBtn').classList.remove('hidden');
+    $('#hint').textContent = '本局结束！共 ' + THEME_ROUNDS + ' 回合，相遇 ' + wins + ' 次。';
+  } else {
+    $('#againBtn').classList.add('hidden');
+    $('#nextBtn').classList.toggle('hidden', !isHost);
+    if(!isHost) $('#hint').textContent = '等待房主开始下一回合…';
+  }
+}
+
+function restartGame() {
+  wins = 0;
+  matchHistory = [];
+  round = 0;
+  used = [];
+  const t = pickTheme();
+  round = 1;
+  resetRound();
+  if(isHost) {
+    try { conn && conn.send({type:'start', mode, theme:t, round:1, wins, history: matchHistory}); } catch(e) {}
+  }
+  enterGame(t, 1);
+}
+
+function nextRound() {
+  if(!isHost) return;
+  if(isFinalRound()) return;
+  round++;
+  const t = pickTheme();
+  try {
+    conn && conn.send({type:'next', theme:t, round, wins, history: matchHistory});
+  } catch(e) {}
+  enterGame(t, round);
+}
+</script>
+</body>
+</html>
